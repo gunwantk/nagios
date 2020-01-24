@@ -1,0 +1,169 @@
+I. Installing The Nagios on nagios-server.
+
+yum install -y gcc glibc glibc-common wget unzip httpd php gd gd-devel perl postfix openssl openssl-devel -y
+mkdir nagios; cd nagios
+wget https://assets.nagios.com/downloads/nagioscore/releases/nagios-4.4.5.tar.gz
+./configure
+make all
+make install-groups-users
+usermod -a -G nagios apache
+make install
+make install-daemoninit
+systemctl enable httpd.service
+make install-commandmode
+make install-config
+make install-webconf
+htpasswd -c /usr/local/nagios/etc/htpasswd.users nagiosadmin
+systemctl start httpd.service
+systemctl start nagios
+http://13.233.103.108/nagios/
+
+
+II. Installing The Nagios Plugins on nagios-server.
+
+yum install -y make gettext automake autoconf net-snmp net-snmp-utils epel-release perl-Net-SNMP
+wget https://nagios-plugins.org/download/nagios-plugins-2.3.1.tar.gz
+tar -xvf nagios-plugins-2.3.1.tar.gz
+./configure
+make
+make install
+systemctl restart nagios
+
+
+III. Installing NRPE on nagios-server.
+
+wget https://github.com/NagiosEnterprises/nrpe/archive/nrpe-3.2.1.tar.gz
+tar -xvf nrpe-3.2.1.tar.gz
+cd nrpe-nrpe-3.2.1
+./configure --enable-command-args
+make all
+make install-groups-users
+make install
+make install-config
+echo >> /etc/services
+echo '# Nagios services' >> /etc/services
+echo 'nrpe    5666/tcp' >> /etc/services
+make install-init
+systemctl enable nrpe.service
+systemctl start nrpe.service
+/usr/local/nagios/libexec/check_nrpe -H 127.0.0.1
+/usr/local/nagios/libexec/check_nrpe -H 127.0.0.1 -c check_load
+
+======================================================================================================
+
+IV. Installing Nagios-plugins on nagios-client
+
+yum install -y gcc glibc glibc-common wget unzip httpd php gd gd-devel perl postfix openssl openssl-devel -y
+yum install -y make gettext automake autoconf net-snmp net-snmp-utils epel-release perl-Net-SNMP
+yum install -y make gettext automake autoconf net-snmp net-snmp-utils epel-release perl-Net-SNMP
+wget https://nagios-plugins.org/download/nagios-plugins-2.3.1.tar.gz
+tar -xvf nagios-plugins-2.3.1.tar.gz
+./configure
+make
+make install
+
+
+V. Installing NRPE on nagios-client.
+
+wget https://github.com/NagiosEnterprises/nrpe/archive/nrpe-3.2.1.tar.gz
+tar -xvf nrpe-3.2.1.tar.gz
+cd nrpe-nrpe-3.2.1
+./configure --enable-command-args
+make all
+make install-groups-users
+make install
+make install-config
+echo >> /etc/services
+echo '# Nagios services' >> /etc/services
+echo 'nrpe    5666/tcp' >> /etc/services
+make install-init
+vi /usr/local/nagios/etc/nrpe.cfg
+systemctl enable nrpe.service
+systemctl start nrpe.service
+/usr/local/nagios/libexec/check_nrpe -H 127.0.0.1
+/usr/local/nagios/libexec/check_nrpe -H 127.0.0.1 -c check_load
+
+======================================================================================================
+
+
+VI. Changes to be done at nagios-server. For adding client to add in nagios monitoring.
+
+mkdir /usr/local/nagios/etc/servers
+vi /usr/local/nagios/etc/nagios.cfg ---> cfg_dir=/usr/local/nagios/etc/servers
+
+vi /usr/local/nagios/etc/objects/commands.cfg
+
+# .check_nrpe. command definition
+define command{
+command_name check_nrpe
+command_line /usr/local/nagios/libexec/check_nrpe -H $HOSTADDRESS$ -t 30 -c $ARG1$
+}
+
+vi /usr/local/nagios/etc/servers/hosts.cfg
+
+Paste below content.
+
+
+
+define host{
+                           
+            use                     linux-server            
+            host_name               ip-172-31-32-160.ap-south-1.compute.internal            
+            alias                   ip-172-31-32-160.ap-south-1.compute.internal            
+            address                 13.127.231.236
+                                    
+}                                   
+                                    
+define hostgroup{                   
+                                    
+            hostgroup_name          linux-server            
+            alias                   Linux Servers            
+            members                 ip-172-31-32-160.ap-south-1.compute.internal
+}                                   
+                                    
+define service{                     
+                                    
+            use                     local-service            
+            host_name               ip-172-31-32-160.ap-south-1.compute.internal            
+            service_description     SWAP Uasge            
+            check_command           check_nrpe!check_swap                          
+                                    
+}                                   
+                                    
+define service{                     
+                                    
+            use                     local-service            
+            host_name               ip-172-31-32-160.ap-south-1.compute.internal            
+            service_description     Root / Partition            
+            check_command           check_nrpe!check_root                          
+                                    
+}                                   
+                                    
+define service{                     
+                                    
+            use                     local-service            
+            host_name               ip-172-31-32-160.ap-south-1.compute.internal            
+            service_description     Current Users            
+            check_command           check_nrpe!check_users                         
+                                    
+}                                   
+                                    
+define service{                     
+                                    
+            use                     local-service            
+            host_name               ip-172-31-32-160.ap-south-1.compute.internal            
+            service_description     Total Processes            
+            check_command           check_nrpe!check_total_procs                   
+                                    
+}                                   
+                                    
+define service{                     
+                                    
+            use                     local-service            
+            host_name               ip-172-31-32-160.ap-south-1.compute.internal            
+            service_description     Current Load            
+            check_command           check_nrpe!check_load
+
+}
+
+systemctl restart nagios.service
